@@ -1,6 +1,6 @@
-# Бот для генерации и публикации карт с гарантией прохождения Luhn
-# Установка: pip install python-telegram-bot
-# Запуск: python bot.py
+# Telegram bot – guaranteed Luhn‑valid card generator
+# Install: pip install python-telegram-bot
+# Run: python bot.py
 
 import asyncio
 import logging
@@ -8,7 +8,7 @@ import random
 from telegram import Bot
 from telegram.error import TelegramError
 
-# ================= КОНФИГ =================
+# ================= CONFIG =================
 BOT_TOKEN = "8616925469:AAEA8xFaOdViyN06g1PETOKacQHkAsmJx9o"
 CHANNEL_ID = "@DuhokCc"
 CARDS_PER_RUN = 10000
@@ -21,21 +21,18 @@ logging.basicConfig(
     handlers=[logging.StreamHandler()]
 )
 
-# ========== LUHN АЛГОРИТМ (ПОЛНАЯ ПРОВЕРКА) ==========
+# ========== LUHN CORE ==========
 def luhn_verify(card_number):
-    """Проверяет, проходит ли полный номер карты проверку Luhn."""
     digits = [int(d) for d in str(card_number)]
-    # Удваиваем каждую вторую цифру, начиная справа
     for i in range(len(digits) - 2, -1, -2):
         doubled = digits[i] * 2
         if doubled > 9:
-            doubled = doubled - 9
+            doubled -= 9
         digits[i] = doubled
-    total = sum(digits)
-    return total % 10 == 0
+    return sum(digits) % 10 == 0
 
 def luhn_checksum(card_number):
-    """Вычисляет контрольную цифру Luhn для первых 15 цифр."""
+    """Compute check digit for first 15 digits."""
     def digits_of(n):
         return [int(d) for d in str(n)]
     digits = digits_of(card_number)
@@ -46,40 +43,36 @@ def luhn_checksum(card_number):
         checksum += sum(digits_of(d * 2))
     return (10 - (checksum % 10)) % 10
 
-def generate_card_number(bin_prefix):
-    """Генерирует 16-значный номер, гарантированно проходящий Luhn."""
-    prefix = str(bin_prefix)
-    length = 16
-    random_part = ''.join([str(random.randint(0, 9)) for _ in range(length - len(prefix) - 1)])
-    base = prefix + random_part          # первые 15 цифр
-    check = luhn_checksum(base)          # вычисляем 16-ю цифру
-    full = base + str(check)
-    # Двойная проверка – если вдруг ошибка, перегенерируем
-    if not luhn_verify(full):
-        logging.error(f"Сгенерирован невалидный номер: {full} – перегенерация")
-        return generate_card_number(bin_prefix)  # рекурсия для гарантии
-    return full
-
-# ========== ФУНКЦИЯ ИСПРАВЛЕНИЯ НЕВАЛИДНОГО НОМЕРА ==========
 def correct_luhn(card_number):
     """
-    Принимает номер карты (16 цифр) и возвращает исправленный номер,
-    проходящий Luhn, изменяя последнюю цифру.
-    Если номер уже валиден – возвращает его без изменений.
+    Force‑correct any 16‑digit number to pass Luhn.
+    Returns the corrected number, or None if invalid length.
     """
-    num_str = str(card_number)
+    num_str = str(card_number).strip()
     if len(num_str) != 16 or not num_str.isdigit():
         return None
     if luhn_verify(num_str):
         return num_str
-    # Берём первые 15 цифр и вычисляем правильную контрольную цифру
     base = num_str[:15]
     correct_check = luhn_checksum(base)
-    corrected = base + str(correct_check)
+    return base + str(correct_check)
+
+def generate_card_number(bin_prefix):
+    """Generate full 16‑digit number, guaranteed valid."""
+    prefix = str(bin_prefix)
+    length = 16
+    random_part = ''.join([str(random.randint(0, 9)) for _ in range(length - len(prefix) - 1)])
+    base = prefix + random_part
+    check = luhn_checksum(base)
+    full = base + str(check)
+    # Double‑check and auto‑correct if anything went wrong (should never happen)
+    corrected = correct_luhn(full)
+    if corrected is None:
+        return generate_card_number(bin_prefix)  # retry
     return corrected
 
+# ========== BIN GENERATION ==========
 def random_bin():
-    """Генерирует случайный 6-значный BIN для Visa (4xxxxx) или MasterCard (51xxxx-55xxxx)."""
     brand = random.choice(["VISA", "MASTERCARD"])
     if brand == "VISA":
         bin_int = random.randint(400000, 499999)
@@ -87,7 +80,7 @@ def random_bin():
         bin_int = random.randint(510000, 559999)
     return bin_int, brand
 
-# ========== АТРИБУТЫ КАРТ ==========
+# ========== ATTRIBUTES ==========
 BANKS = [
     "CHASE BANK", "BANK OF AMERICA", "CITIBANK", "WELLS FARGO",
     "CAPITAL ONE", "HSBC", "UBS", "PNC", "SCHOOLS FIRST FEDERAL",
@@ -99,7 +92,6 @@ STATUSES = ["Private", "Public", "Validated"]
 CARD_TYPES = ["credit", "debit"]
 
 def random_card():
-    """Генерирует одну запись карты."""
     bin_choice, brand = random_bin()
     number = generate_card_number(bin_choice)
     month = f"{random.randint(1, 12):02d}"
@@ -124,7 +116,7 @@ def format_raw_line(card):
             f"{card['bank']}|{card['brand']}|{card['type']}|{card['category']}|"
             f"{card['country']}|{card['gate']}|{card['status']}")
 
-# ========== КЛАСС БОТА ==========
+# ========== BOT ==========
 class CardBot:
     def __init__(self, token, channel):
         self.bot = Bot(token=token)
@@ -132,29 +124,30 @@ class CardBot:
         self.posted = set()
 
     async def post_card(self, card):
-        # Дополнительная проверка перед отправкой – если невалидный, пропускаем
-        if not luhn_verify(card['number']):
-            logging.error(f"Luhn FAILED для {card['number']} – пропуск")
+        # Final safety net – correct the number if it somehow is invalid
+        corrected = correct_luhn(card['number'])
+        if corrected is None:
+            logging.error(f"Invalid card number: {card['number']} – skipping")
             return False
+        if corrected != card['number']:
+            logging.warning(f"Corrected {card['number']} -> {corrected}")
+            card['number'] = corrected
 
         line = format_raw_line(card)
         for attempt in range(3):
             try:
                 await self.bot.send_message(chat_id=self.channel, text=line, parse_mode=None)
-                logging.info(f"Опубликовано: {card['number'][:4]}****{card['number'][-4:]} | {card['bank']} | {card['category']}")
+                logging.info(f"Posted: {card['number'][:4]}****{card['number'][-4:]}")
                 self.posted.add(card['number'])
                 return True
             except TelegramError as e:
                 if "Flood" in str(e):
                     msg = str(e)
-                    if "retry after" in msg:
-                        wait = int(msg.split("retry after ")[1].split()[0])
-                    else:
-                        wait = 10
-                    logging.warning(f"Flood wait {wait}s, повтор...")
+                    wait = int(msg.split("retry after ")[1].split()[0]) if "retry after" in msg else 10
+                    logging.warning(f"Flood wait {wait}s, retrying...")
                     await asyncio.sleep(wait)
                 else:
-                    logging.error(f"Ошибка: {e}")
+                    logging.error(f"Error: {e}")
                     await asyncio.sleep(5)
                     break
         return False
@@ -162,24 +155,24 @@ class CardBot:
     async def run_single_cycle(self, count, delay):
         cards = [random_card() for _ in range(count)]
         random.shuffle(cards)
-        logging.info(f"Сгенерировано {len(cards)} карт.")
+        logging.info(f"Generated {len(cards)} cards.")
         for idx, card in enumerate(cards, 1):
             if card['number'] in self.posted:
                 continue
             success = await self.post_card(card)
             if idx % 100 == 0:
-                logging.info(f"Прогресс: {idx}/{len(cards)}")
+                logging.info(f"Progress: {idx}/{len(cards)}")
             await asyncio.sleep(delay if success else delay * 2)
         self.posted.clear()
-        logging.info(f"Цикл завершён: {len(cards)} карт.")
+        logging.info(f"Cycle done: {len(cards)} cards.")
 
     async def run_forever(self, cards_per_cycle, cycle_delay, post_delay):
         cycle = 0
         while True:
             cycle += 1
-            logging.info(f"=== СТАРТ ЦИКЛА {cycle} ({cards_per_cycle} карт) ===")
+            logging.info(f"=== CYCLE {cycle} START ===")
             await self.run_single_cycle(cards_per_cycle, post_delay)
-            logging.info(f"=== ЦИКЛ {cycle} ЗАВЕРШЁН. Сон {cycle_delay}с ===")
+            logging.info(f"=== CYCLE {cycle} DONE. Sleeping {cycle_delay}s ===")
             await asyncio.sleep(cycle_delay)
 
 async def main():
@@ -190,4 +183,4 @@ if __name__ == "__main__":
     try:
         asyncio.run(main())
     except KeyboardInterrupt:
-        logging.info("Бот остановлен.")
+        logging.info("Bot stopped.")

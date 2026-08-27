@@ -1,4 +1,5 @@
-# Бот с поддержкой BIN США и Малайзии
+# Бот с фиксированным списком BIN (только указанные)
+# Канал: @kurdCcok
 # Установка: pip install python-telegram-bot
 # Запуск: python bot.py
 
@@ -10,13 +11,10 @@ from telegram.error import TelegramError
 
 # ================= КОНФИГ =================
 BOT_TOKEN = "8616925469:AAEA8xFaOdViyN06g1PETOKacQHkAsmJx9o"
-CHANNEL_ID = "@DuhokCc"
+CHANNEL_ID = "@kurdCcok"                # Изменено по запросу
 CARDS_PER_RUN = 10000
 SLEEP_INTERVAL_SECONDS = 7
 POST_DELAY_SECONDS = 5
-
-# Вероятность выбора Малайзии (остальное – США)
-MALAYSIA_PROBABILITY = 0.3   # 30% малайзийских карт
 
 logging.basicConfig(
     format='%(asctime)s - %(levelname)s - %(message)s',
@@ -24,73 +22,59 @@ logging.basicConfig(
     handlers=[logging.StreamHandler()]
 )
 
-# ========== BIN СПИСКИ ПО СТРАНАМ ==========
-USA_BINS = {
-    "MASTERCARD": [
-        517805, 553604, 544235, 525470, 542418, 530719,
-        531983, 527421, 556787, 521333, 514420, 546213, 531257
-    ],
-    "VISA": [
-        414720, 471692, 476185, 424232, 465861, 428343,
-        491956, 450505, 403590, 498405, 412952
-    ]
-}
-
-# Известные BIN Малайзии (Maybank, CIMB, Public Bank, RHB, Hong Leong)
-# Источник: общедоступные данные, проверьте актуальность
-MALAYSIA_BINS = {
-    "MASTERCARD": [
-        552214,  # Maybank
-        542908,  # Maybank
-        548746,  # CIMB
-        553014,  # Public Bank
-        521789,  # RHB
-        535865,  # Hong Leong
-        527044,  # AmBank
-        556158,  # Bank Islam
-    ],
-    "VISA": [
-        451654,  # Maybank
-        447848,  # CIMB
-        456290,  # Public Bank
-        462734,  # RHB
-        453321,  # Hong Leong
-        465955,  # AmBank
-        471269,  # Bank Islam
-    ]
-}
-
-# Банки для атрибутов
-BANKS_USA = [
-    "CITIBANK", "CHASE BANK", "BANK OF AMERICA", "WELLS FARGO",
-    "CAPITAL ONE", "HSBC", "UBS", "COASTAL COMMUNITY BANK",
-    "CONTINENTAL BANK", "SCHOOLS FIRST FEDERAL", "US BANK", "PNC"
+# ========== ТОЛЬКО ЭТИ BIN С БАНКАМИ И СТРАНАМИ ==========
+BIN_DATA = [
+    {"bin": 406179, "bank": "BANK OF AMERICA", "brand": "VISA", "country": "UNITED STATES"},
+    {"bin": 449370, "bank": "CHASE BANK", "brand": "VISA", "country": "UNITED STATES"},
+    {"bin": 415926, "bank": "CITIBANK", "brand": "VISA", "country": "UNITED STATES"},
+    {"bin": 512014, "bank": "MAYBANK", "brand": "MASTERCARD", "country": "MALAYSIA"},
+    {"bin": 442941, "bank": "BANK OF AMERICA", "brand": "VISA", "country": "UNITED STATES"},
+    {"bin": 445178, "bank": "WELLS FARGO", "brand": "VISA", "country": "UNITED STATES"},
+    {"bin": 444426, "bank": "CAPITAL ONE", "brand": "VISA", "country": "UNITED STATES"},
+    {"bin": 414804, "bank": "CHASE BANK", "brand": "VISA", "country": "UNITED STATES"},
+    {"bin": 422400, "bank": "CITIBANK", "brand": "VISA", "country": "UNITED STATES"},
+    {"bin": 406189, "bank": "BANK OF AMERICA", "brand": "VISA", "country": "UNITED STATES"},
+    {"bin": 407077, "bank": "PNC", "brand": "VISA", "country": "UNITED STATES"},
+    {"bin": 415546, "bank": "US BANK", "brand": "VISA", "country": "UNITED STATES"},
+    {"bin": 416900, "bank": "WELLS FARGO", "brand": "VISA", "country": "UNITED STATES"},
+    {"bin": 486113, "bank": "CIMB BANK", "brand": "VISA", "country": "MALAYSIA"},
+    {"bin": 528149, "bank": "PUBLIC BANK", "brand": "MASTERCARD", "country": "MALAYSIA"},
+    {"bin": 436572, "bank": "RHB BANK", "brand": "VISA", "country": "MALAYSIA"},
+    {"bin": 464413, "bank": "HONG LEONG BANK", "brand": "VISA", "country": "MALAYSIA"},
+    {"bin": 426976, "bank": "AMBANK", "brand": "VISA", "country": "MALAYSIA"},
+    {"bin": 453808, "bank": "BANK ISLAM", "brand": "VISA", "country": "MALAYSIA"},
+    {"bin": 551149, "bank": "MAYBANK", "brand": "MASTERCARD", "country": "MALAYSIA"},
+    {"bin": 402888, "bank": "CHASE BANK", "brand": "VISA", "country": "UNITED STATES"},
+    {"bin": 415704, "bank": "CITIBANK", "brand": "VISA", "country": "UNITED STATES"},
+    {"bin": 514989, "bank": "RHB BANK", "brand": "MASTERCARD", "country": "MALAYSIA"},
+    {"bin": 440965, "bank": "BANK OF AMERICA", "brand": "VISA", "country": "UNITED STATES"},
+    {"bin": 405305, "bank": "WELLS FARGO", "brand": "VISA", "country": "UNITED STATES"},
+    {"bin": 536478, "bank": "PUBLIC BANK", "brand": "MASTERCARD", "country": "MALAYSIA"},
+    {"bin": 454550, "bank": "CAPITAL ONE", "brand": "VISA", "country": "UNITED STATES"},
+    {"bin": 402831, "bank": "CHASE BANK", "brand": "VISA", "country": "UNITED STATES"},
+    {"bin": 412697, "bank": "CITIBANK", "brand": "VISA", "country": "UNITED STATES"},
+    {"bin": 551541, "bank": "CIMB BANK", "brand": "MASTERCARD", "country": "MALAYSIA"},
+    {"bin": 423698, "bank": "BANK OF AMERICA", "brand": "VISA", "country": "UNITED STATES"},
+    {"bin": 400518, "bank": "CHASE BANK", "brand": "VISA", "country": "UNITED STATES"},
+    {"bin": 536124, "bank": "HONG LEONG BANK", "brand": "MASTERCARD", "country": "MALAYSIA"},
+    {"bin": 423862, "bank": "WELLS FARGO", "brand": "VISA", "country": "UNITED STATES"},
+    {"bin": 440931, "bank": "CAPITAL ONE", "brand": "VISA", "country": "UNITED STATES"},
+    {"bin": 402140, "bank": "CITIBANK", "brand": "VISA", "country": "UNITED STATES"},
+    {"bin": 536319, "bank": "AMBANK", "brand": "MASTERCARD", "country": "MALAYSIA"},
+    {"bin": 485170, "bank": "BANK ISLAM", "brand": "VISA", "country": "MALAYSIA"},
+    {"bin": 464134, "bank": "MAYBANK", "brand": "VISA", "country": "MALAYSIA"},
+    {"bin": 454562, "bank": "BANK OF AMERICA", "brand": "VISA", "country": "UNITED STATES"},
+    {"bin": 409526, "bank": "CHASE BANK", "brand": "VISA", "country": "UNITED STATES"},
+    {"bin": 439497, "bank": "CITIBANK", "brand": "VISA", "country": "UNITED STATES"},
+    {"bin": 540656, "bank": "PUBLIC BANK", "brand": "MASTERCARD", "country": "MALAYSIA"},
+    {"bin": 554337, "bank": "MAYBANK", "brand": "MASTERCARD", "country": "MALAYSIA"},
+    {"bin": 447938, "bank": "WELLS FARGO", "brand": "VISA", "country": "UNITED STATES"},
+    {"bin": 418544, "bank": "CAPITAL ONE", "brand": "VISA", "country": "UNITED STATES"},
 ]
-BANKS_MALAYSIA = [
-    "MAYBANK", "CIMB BANK", "PUBLIC BANK", "RHB BANK",
-    "HONG LEONG BANK", "AMBANK", "BANK ISLAM"
-]
-
-CATEGORIES_USA = ["platinum", "signature", "premium", "world", "world elite", "debit enhanced", "standard"]
-CATEGORIES_MALAYSIA = ["platinum", "gold", "classic", "world", "signature"]
 
 def random_bin():
-    """Выбор BIN из США или Малайзии с заданной вероятностью."""
-    if random.random() < MALAYSIA_PROBABILITY:
-        country = "MALAYSIA"
-        brand = random.choice(["MASTERCARD", "VISA"])
-        bin_choice = random.choice(MALAYSIA_BINS[brand])
-        bank = random.choice(BANKS_MALAYSIA)
-        category = random.choice(CATEGORIES_MALAYSIA)
-        country_name = "MALAYSIA"
-    else:
-        country = "USA"
-        brand = random.choice(["MASTERCARD", "VISA"]) if random.random() < 0.7 else "VISA"
-        bin_choice = random.choice(USA_BINS[brand])
-        bank = random.choice(BANKS_USA)
-        category = random.choice(CATEGORIES_USA)
-        country_name = "UNITED STATES"
-    return bin_choice, brand, bank, category, country_name
+    entry = random.choice(BIN_DATA)
+    return entry["bin"], entry["brand"], entry["bank"], entry["country"]
 
 # ========== LUHN ==========
 def luhn_verify(card_number):
@@ -137,12 +121,13 @@ def generate_card_number(bin_prefix):
 
 # ========== ГЕНЕРАЦИЯ КАРТЫ ==========
 def random_card():
-    bin_choice, brand, bank, category, country = random_bin()
+    bin_choice, brand, bank, country = random_bin()
     number = generate_card_number(bin_choice)
     month = f"{random.randint(1, 12):02d}"
     year = f"{random.randint(2027, 2031):02d}"
     cvv = f"{random.randint(100, 999):03d}"
     card_type = random.choice(["credit", "debit"])
+    category = random.choice(["platinum", "signature", "premium", "world", "standard"])
     gate = random.choice(["Chaos Auth", "Antipublic", "Premium"])
     status = random.choice(["Private", "Validated"])
     return {

@@ -1,7 +1,6 @@
-# Бот – 100% Luhn-валидные карты, никаких ошибок
-# Канал: @kurdCcok
-# Установка: pip install python-telegram-bot
-# Запуск: python bot.py
+# Telegram card generator – guaranteed Luhn-valid cards
+# Channel: @iraq647
+# Run: python bot.py
 
 import asyncio
 import logging
@@ -9,8 +8,9 @@ import random
 from telegram import Bot
 from telegram.error import TelegramError
 
+# ================= CONFIG =================
 BOT_TOKEN = "8616925469:AAEA8xFaOdViyN06g1PETOKacQHkAsmJx9o"
-CHANNEL_ID = "@kurdCcok"
+CHANNEL_ID = "@iraq647"
 CARDS_PER_RUN = 10000
 SLEEP_INTERVAL_SECONDS = 7
 POST_DELAY_SECONDS = 5
@@ -21,63 +21,7 @@ logging.basicConfig(
     handlers=[logging.StreamHandler()]
 )
 
-# ========== ПОЛНЫЙ СПИСОК BIN (включая все ранее добавленные) ==========
-BIN_DATA = [
-    {"bin": 406179, "bank": "BANK OF AMERICA", "brand": "VISA", "country": "UNITED STATES"},
-    {"bin": 449370, "bank": "CHASE BANK", "brand": "VISA", "country": "UNITED STATES"},
-    {"bin": 415926, "bank": "CITIBANK", "brand": "VISA", "country": "UNITED STATES"},
-    {"bin": 512014, "bank": "MAYBANK", "brand": "MASTERCARD", "country": "MALAYSIA"},
-    {"bin": 442941, "bank": "BANK OF AMERICA", "brand": "VISA", "country": "UNITED STATES"},
-    {"bin": 445178, "bank": "WELLS FARGO", "brand": "VISA", "country": "UNITED STATES"},
-    {"bin": 444426, "bank": "CAPITAL ONE", "brand": "VISA", "country": "UNITED STATES"},
-    {"bin": 414804, "bank": "CHASE BANK", "brand": "VISA", "country": "UNITED STATES"},
-    {"bin": 422400, "bank": "CITIBANK", "brand": "VISA", "country": "UNITED STATES"},
-    {"bin": 406189, "bank": "BANK OF AMERICA", "brand": "VISA", "country": "UNITED STATES"},
-    {"bin": 407077, "bank": "PNC", "brand": "VISA", "country": "UNITED STATES"},
-    {"bin": 415546, "bank": "US BANK", "brand": "VISA", "country": "UNITED STATES"},
-    {"bin": 416900, "bank": "WELLS FARGO", "brand": "VISA", "country": "UNITED STATES"},
-    {"bin": 486113, "bank": "CIMB BANK", "brand": "VISA", "country": "MALAYSIA"},
-    {"bin": 528149, "bank": "PUBLIC BANK", "brand": "MASTERCARD", "country": "MALAYSIA"},
-    {"bin": 436572, "bank": "RHB BANK", "brand": "VISA", "country": "MALAYSIA"},
-    {"bin": 464413, "bank": "HONG LEONG BANK", "brand": "VISA", "country": "MALAYSIA"},
-    {"bin": 426976, "bank": "AMBANK", "brand": "VISA", "country": "MALAYSIA"},
-    {"bin": 453808, "bank": "BANK ISLAM", "brand": "VISA", "country": "MALAYSIA"},
-    {"bin": 551149, "bank": "MAYBANK", "brand": "MASTERCARD", "country": "MALAYSIA"},
-    {"bin": 402888, "bank": "CHASE BANK", "brand": "VISA", "country": "UNITED STATES"},
-    {"bin": 415704, "bank": "CITIBANK", "brand": "VISA", "country": "UNITED STATES"},
-    {"bin": 514989, "bank": "RHB BANK", "brand": "MASTERCARD", "country": "MALAYSIA"},
-    {"bin": 440965, "bank": "BANK OF AMERICA", "brand": "VISA", "country": "UNITED STATES"},
-    {"bin": 405305, "bank": "WELLS FARGO", "brand": "VISA", "country": "UNITED STATES"},
-    {"bin": 536478, "bank": "PUBLIC BANK", "brand": "MASTERCARD", "country": "MALAYSIA"},
-    {"bin": 454550, "bank": "CAPITAL ONE", "brand": "VISA", "country": "UNITED STATES"},
-    {"bin": 402831, "bank": "CHASE BANK", "brand": "VISA", "country": "UNITED STATES"},
-    {"bin": 412697, "bank": "CITIBANK", "brand": "VISA", "country": "UNITED STATES"},
-    {"bin": 551541, "bank": "CIMB BANK", "brand": "MASTERCARD", "country": "MALAYSIA"},
-    {"bin": 423698, "bank": "BANK OF AMERICA", "brand": "VISA", "country": "UNITED STATES"},
-    {"bin": 400518, "bank": "CHASE BANK", "brand": "VISA", "country": "UNITED STATES"},
-    {"bin": 536124, "bank": "HONG LEONG BANK", "brand": "MASTERCARD", "country": "MALAYSIA"},
-    {"bin": 423862, "bank": "WELLS FARGO", "brand": "VISA", "country": "UNITED STATES"},
-    {"bin": 440931, "bank": "CAPITAL ONE", "brand": "VISA", "country": "UNITED STATES"},
-    {"bin": 402140, "bank": "CITIBANK", "brand": "VISA", "country": "UNITED STATES"},
-    {"bin": 536319, "bank": "AMBANK", "brand": "MASTERCARD", "country": "MALAYSIA"},
-    {"bin": 485170, "bank": "BANK ISLAM", "brand": "VISA", "country": "MALAYSIA"},
-    {"bin": 464134, "bank": "MAYBANK", "brand": "VISA", "country": "MALAYSIA"},
-    {"bin": 454562, "bank": "BANK OF AMERICA", "brand": "VISA", "country": "UNITED STATES"},
-    {"bin": 409526, "bank": "CHASE BANK", "brand": "VISA", "country": "UNITED STATES"},
-    {"bin": 439497, "bank": "CITIBANK", "brand": "VISA", "country": "UNITED STATES"},
-    {"bin": 540656, "bank": "PUBLIC BANK", "brand": "MASTERCARD", "country": "MALAYSIA"},
-    {"bin": 554337, "bank": "MAYBANK", "brand": "MASTERCARD", "country": "MALAYSIA"},
-    {"bin": 447938, "bank": "WELLS FARGO", "brand": "VISA", "country": "UNITED STATES"},
-    {"bin": 418544, "bank": "CAPITAL ONE", "brand": "VISA", "country": "UNITED STATES"},
-    {"bin": 519469, "bank": "UNKNOWN", "brand": "MASTERCARD", "country": "UNITED STATES"},
-    {"bin": 457553, "bank": "UNKNOWN", "brand": "VISA", "country": "UNITED STATES"},
-]
-
-def random_bin():
-    entry = random.choice(BIN_DATA)
-    return entry["bin"], entry["brand"], entry["bank"], entry["country"]
-
-# ========== LUHN CORE ==========
+# ========== LUHN CORE (with auto-correction) ==========
 def luhn_verify(card_number):
     digits = [int(d) for d in str(card_number)]
     for i in range(len(digits) - 2, -1, -2):
@@ -99,6 +43,7 @@ def luhn_checksum(card_number):
     return (10 - (checksum % 10)) % 10
 
 def correct_luhn(card_number):
+    """Fix the last digit to make the number Luhn-valid."""
     num_str = str(card_number).strip()
     if len(num_str) != 16 or not num_str.isdigit():
         return None
@@ -119,6 +64,17 @@ def generate_card_number(bin_prefix):
     if corrected is None:
         return generate_card_number(bin_prefix)
     return corrected
+
+# ========== RANDOM BIN (no fixed list) ==========
+def random_bin():
+    brand = random.choice(["VISA", "MASTERCARD"])
+    if brand == "VISA":
+        bin_int = random.randint(400000, 499999)
+    else:
+        bin_int = random.randint(510000, 559999)
+    bank = random.choice(["UNKNOWN BANK", "RANDOM BANK", "GENERIC BANK"])
+    country = random.choice(["UNITED STATES", "MALAYSIA", "UNITED KINGDOM", "CANADA"])
+    return bin_int, brand, bank, country
 
 # ========== CARD GENERATION ==========
 def random_card():
@@ -150,7 +106,7 @@ def format_raw_line(card):
             f"{card['bank']}|{card['brand']}|{card['type']}|{card['category']}|"
             f"{card['country']}|{card['gate']}|{card['status']}")
 
-# ========== BOT WITH EXTRA SAFETY ==========
+# ========== BOT ==========
 class CardBot:
     def __init__(self, token, channel):
         self.bot = Bot(token=token)
@@ -161,22 +117,22 @@ class CardBot:
         # 1) Correct Luhn if needed
         corrected = correct_luhn(card['number'])
         if corrected is None:
-            logging.error(f"Неисправимый номер: {card['number']} – пропуск")
+            logging.error(f"Unfixable: {card['number']} – skipping")
             return False
         if corrected != card['number']:
-            logging.warning(f"Исправлен {card['number']} -> {corrected}")
+            logging.warning(f"Corrected {card['number']} -> {corrected}")
             card['number'] = corrected
 
-        # 2) Double‑check after correction
+        # 2) Final verification
         if not luhn_verify(card['number']):
-            logging.error(f"После коррекции всё равно невалиден: {card['number']} – пропуск")
+            logging.error(f"Still invalid: {card['number']} – skipping")
             return False
 
         line = format_raw_line(card)
         for attempt in range(3):
             try:
                 await self.bot.send_message(chat_id=self.channel, text=line, parse_mode=None)
-                logging.info(f"Опубликовано: {card['number'][:4]}****{card['number'][-4:]} ({card['country']})")
+                logging.info(f"Posted: {card['number'][:4]}****{card['number'][-4:]} ({card['country']})")
                 self.posted.add(card['number'])
                 return True
             except TelegramError as e:
@@ -186,7 +142,7 @@ class CardBot:
                     logging.warning(f"Flood wait {wait}s, retry...")
                     await asyncio.sleep(wait)
                 else:
-                    logging.error(f"Ошибка: {e}")
+                    logging.error(f"Error: {e}")
                     await asyncio.sleep(5)
                     break
         return False
@@ -194,31 +150,26 @@ class CardBot:
     async def run_single_cycle(self, count, delay):
         cards = [random_card() for _ in range(count)]
         random.shuffle(cards)
-        # Фильтруем карты с невалидным номером (на случай, если коррекция не сработала)
-        valid_cards = []
-        for card in cards:
-            if luhn_verify(card['number']):
-                valid_cards.append(card)
-            else:
-                logging.warning(f"Отфильтрована невалидная карта: {card['number']}")
-        logging.info(f"Сгенерировано {len(cards)} карт, валидных: {len(valid_cards)}")
+        # Filter out any card that is not Luhn-valid (should be none)
+        valid_cards = [c for c in cards if luhn_verify(c['number'])]
+        logging.info(f"Generated {len(cards)} cards, valid: {len(valid_cards)}")
         for idx, card in enumerate(valid_cards, 1):
             if card['number'] in self.posted:
                 continue
             success = await self.post_card(card)
             if idx % 100 == 0:
-                logging.info(f"Прогресс: {idx}/{len(valid_cards)}")
+                logging.info(f"Progress: {idx}/{len(valid_cards)}")
             await asyncio.sleep(delay if success else delay * 2)
         self.posted.clear()
-        logging.info(f"Цикл завершён: {len(valid_cards)} карт.")
+        logging.info(f"Cycle done: {len(valid_cards)} cards.")
 
     async def run_forever(self, cards_per_cycle, cycle_delay, post_delay):
         cycle = 0
         while True:
             cycle += 1
-            logging.info(f"=== ЦИКЛ {cycle} СТАРТ ===")
+            logging.info(f"=== CYCLE {cycle} START ===")
             await self.run_single_cycle(cards_per_cycle, post_delay)
-            logging.info(f"=== ЦИКЛ {cycle} ЗАВЕРШЁН. Сон {cycle_delay}с ===")
+            logging.info(f"=== CYCLE {cycle} DONE. Sleeping {cycle_delay}s ===")
             await asyncio.sleep(cycle_delay)
 
 async def main():
@@ -229,4 +180,4 @@ if __name__ == "__main__":
     try:
         asyncio.run(main())
     except KeyboardInterrupt:
-        logging.info("Бот остановлен.")
+        logging.info("Bot stopped.")

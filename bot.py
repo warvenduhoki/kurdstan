@@ -1,4 +1,4 @@
-# Telegram bot – automated card generator
+# Telegram bot – automated card generator with built‑in Luhn verification
 # Install: pip install python-telegram-bot
 # Run: python bot.py
 
@@ -11,9 +11,9 @@ from telegram.error import TelegramError
 # ================= CONFIG =================
 BOT_TOKEN = "8616925469:AAEA8xFaOdViyN06g1PETOKacQHkAsmJx9o"
 CHANNEL_ID = "@DuhokCc"
-CARDS_PER_RUN = 10000                # 10,000 cards per cycle
-SLEEP_INTERVAL_SECONDS = 7           # 7 seconds between cycles
-POST_DELAY_SECONDS = 5               # delay between individual card posts
+CARDS_PER_RUN = 10000
+SLEEP_INTERVAL_SECONDS = 7
+POST_DELAY_SECONDS = 5
 
 logging.basicConfig(
     format='%(asctime)s - %(levelname)s - %(message)s',
@@ -21,17 +21,19 @@ logging.basicConfig(
     handlers=[logging.StreamHandler()]
 )
 
-# ========== BIN GENERATION (RANDOM RANGES) ==========
-def random_bin():
-    """Generate a random 6‑digit BIN for Visa or MasterCard."""
-    brand = random.choice(["VISA", "MASTERCARD"])
-    if brand == "VISA":
-        bin_int = random.randint(400000, 499999)   # Visa range
-    else:
-        bin_int = random.randint(510000, 559999)   # MasterCard range
-    return bin_int, brand
+# ========== LUHN ALGORITHM (FULL CHECK) ==========
+def luhn_verify(card_number):
+    """Return True if the full card number passes Luhn check."""
+    digits = [int(d) for d in str(card_number)]
+    # Double every second digit from the right
+    for i in range(len(digits) - 2, -1, -2):
+        doubled = digits[i] * 2
+        if doubled > 9:
+            doubled = doubled - 9
+        digits[i] = doubled
+    total = sum(digits)
+    return total % 10 == 0
 
-# ========== LUHN ALGORITHM ==========
 def luhn_checksum(card_number):
     """Compute Luhn check digit for the first 15 digits."""
     def digits_of(n):
@@ -50,8 +52,21 @@ def generate_card_number(bin_prefix):
     length = 16
     random_part = ''.join([str(random.randint(0, 9)) for _ in range(length - len(prefix) - 1)])
     base = prefix + random_part          # first 15 digits
-    check = luhn_checksum(base)          # compute the 16th digit
-    return base + str(check)
+    check = luhn_checksum(base)
+    full = base + str(check)
+    # Double-check – should always pass
+    if not luhn_verify(full):
+        logging.error(f"Luhn verification FAILED for generated number: {full}")
+    return full
+
+def random_bin():
+    """Generate a random 6‑digit BIN for Visa or MasterCard."""
+    brand = random.choice(["VISA", "MASTERCARD"])
+    if brand == "VISA":
+        bin_int = random.randint(400000, 499999)
+    else:
+        bin_int = random.randint(510000, 559999)
+    return bin_int, brand
 
 # ========== CARD ATTRIBUTES ==========
 BANKS = [
@@ -86,7 +101,6 @@ def random_card():
     }
 
 def format_raw_line(card):
-    """Format as pipe‑separated line without extra text."""
     return (f"{card['number']}|{card['month']}|{card['year']}|{card['cvv']}|"
             f"{card['bank']}|{card['brand']}|{card['type']}|{card['category']}|"
             f"{card['country']}|{card['gate']}|{card['status']}")
@@ -99,8 +113,13 @@ class CardBot:
         self.posted = set()
 
     async def post_card(self, card):
+        # Extra safety: verify Luhn before posting
+        if not luhn_verify(card['number']):
+            logging.error(f"Luhn FAILED for {card['number']} – skipping.")
+            return False
+
         line = format_raw_line(card)
-        for attempt in range(3):  # retry on failure
+        for attempt in range(3):
             try:
                 await self.bot.send_message(chat_id=self.channel, text=line, parse_mode=None)
                 logging.info(f"Posted: {card['number'][:4]}****{card['number'][-4:]} | {card['bank']} | {card['category']}")
@@ -108,7 +127,6 @@ class CardBot:
                 return True
             except TelegramError as e:
                 if "Flood" in str(e):
-                    # extract wait time from error message if present
                     msg = str(e)
                     if "retry after" in msg:
                         wait = int(msg.split("retry after ")[1].split()[0])
@@ -119,33 +137,32 @@ class CardBot:
                 else:
                     logging.error(f"Error: {e}")
                     await asyncio.sleep(5)
-                    break  # stop retrying for non‑flood errors
+                    break
         return False
 
     async def run_single_cycle(self, count, delay):
         cards = [random_card() for _ in range(count)]
         random.shuffle(cards)
-        logging.info(f"Generated {len(cards)} cards, shuffled.")
+        logging.info(f"Generated {len(cards)} cards.")
         for idx, card in enumerate(cards, 1):
             if card['number'] in self.posted:
                 continue
             success = await self.post_card(card)
             if idx % 100 == 0:
-                logging.info(f"Progress: {idx}/{len(cards)} posted.")
+                logging.info(f"Progress: {idx}/{len(cards)}")
             await asyncio.sleep(delay if success else delay * 2)
         self.posted.clear()
-        logging.info(f"Cycle completed: {len(cards)} cards processed.")
+        logging.info(f"Cycle completed: {len(cards)} cards.")
 
     async def run_forever(self, cards_per_cycle, cycle_delay, post_delay):
         cycle = 0
         while True:
             cycle += 1
-            logging.info(f"=== STARTING CYCLE {cycle} ({cards_per_cycle} cards) ===")
+            logging.info(f"=== CYCLE {cycle} START ({cards_per_cycle} cards) ===")
             await self.run_single_cycle(cards_per_cycle, post_delay)
-            logging.info(f"=== CYCLE {cycle} FINISHED. Sleeping {cycle_delay}s ===")
+            logging.info(f"=== CYCLE {cycle} DONE. Sleeping {cycle_delay}s ===")
             await asyncio.sleep(cycle_delay)
 
-# ========== MAIN ==========
 async def main():
     bot = CardBot(BOT_TOKEN, CHANNEL_ID)
     await bot.run_forever(CARDS_PER_RUN, SLEEP_INTERVAL_SECONDS, POST_DELAY_SECONDS)
@@ -154,4 +171,4 @@ if __name__ == "__main__":
     try:
         asyncio.run(main())
     except KeyboardInterrupt:
-        logging.info("Bot stopped by user.")
+        logging.info("Bot stopped.")

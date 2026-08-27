@@ -5,7 +5,7 @@
 
 import asyncio
 import logging
-import random
+import randomeeee
 from telegram import Bot
 from telegram.error import TelegramError
 

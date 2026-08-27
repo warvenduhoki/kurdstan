@@ -1,17 +1,17 @@
-# Бот с фиксированным списком BIN (только указанные)
+# Бот с фиксированным списком BIN (полная версия)
 # Канал: @kurdCcok
 # Установка: pip install python-telegram-bot
 # Запуск: python bot.py
 
 import asyncio
 import logging
-import randomeeee
+import random
 from telegram import Bot
 from telegram.error import TelegramError
 
 # ================= КОНФИГ =================
 BOT_TOKEN = "8616925469:AAEA8xFaOdViyN06g1PETOKacQHkAsmJx9o"
-CHANNEL_ID = "@kurdCcok"                # Изменено по запросу
+CHANNEL_ID = "@kurdCcok"
 CARDS_PER_RUN = 10000
 SLEEP_INTERVAL_SECONDS = 7
 POST_DELAY_SECONDS = 5
@@ -22,7 +22,7 @@ logging.basicConfig(
     handlers=[logging.StreamHandler()]
 )
 
-# ========== ТОЛЬКО ЭТИ BIN С БАНКАМИ И СТРАНАМИ ==========
+# ========== ПОЛНЫЙ СПИСОК BIN (включая 519469 и 457553) ==========
 BIN_DATA = [
     {"bin": 406179, "bank": "BANK OF AMERICA", "brand": "VISA", "country": "UNITED STATES"},
     {"bin": 449370, "bank": "CHASE BANK", "brand": "VISA", "country": "UNITED STATES"},
@@ -70,13 +70,15 @@ BIN_DATA = [
     {"bin": 554337, "bank": "MAYBANK", "brand": "MASTERCARD", "country": "MALAYSIA"},
     {"bin": 447938, "bank": "WELLS FARGO", "brand": "VISA", "country": "UNITED STATES"},
     {"bin": 418544, "bank": "CAPITAL ONE", "brand": "VISA", "country": "UNITED STATES"},
+    {"bin": 519469, "bank": "UNKNOWN", "brand": "MASTERCARD", "country": "UNITED STATES"},
+    {"bin": 457553, "bank": "UNKNOWN", "brand": "VISA", "country": "UNITED STATES"},
 ]
 
 def random_bin():
     entry = random.choice(BIN_DATA)
     return entry["bin"], entry["brand"], entry["bank"], entry["country"]
 
-# ========== LUHN ==========
+# ========== LUHN С АВТОКОРРЕКЦИЕЙ ==========
 def luhn_verify(card_number):
     digits = [int(d) for d in str(card_number)]
     for i in range(len(digits) - 2, -1, -2):

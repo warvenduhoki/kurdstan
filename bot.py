@@ -1,4 +1,4 @@
-# Бот с фиксированным списком BIN (полная версия)
+# Бот – 100% Luhn-валидные карты, никаких ошибок
 # Канал: @kurdCcok
 # Установка: pip install python-telegram-bot
 # Запуск: python bot.py
@@ -9,7 +9,6 @@ import random
 from telegram import Bot
 from telegram.error import TelegramError
 
-# ================= КОНФИГ =================
 BOT_TOKEN = "8616925469:AAEA8xFaOdViyN06g1PETOKacQHkAsmJx9o"
 CHANNEL_ID = "@kurdCcok"
 CARDS_PER_RUN = 10000
@@ -22,7 +21,7 @@ logging.basicConfig(
     handlers=[logging.StreamHandler()]
 )
 
-# ========== ПОЛНЫЙ СПИСОК BIN (включая 519469 и 457553) ==========
+# ========== ПОЛНЫЙ СПИСОК BIN (включая все ранее добавленные) ==========
 BIN_DATA = [
     {"bin": 406179, "bank": "BANK OF AMERICA", "brand": "VISA", "country": "UNITED STATES"},
     {"bin": 449370, "bank": "CHASE BANK", "brand": "VISA", "country": "UNITED STATES"},
@@ -78,7 +77,7 @@ def random_bin():
     entry = random.choice(BIN_DATA)
     return entry["bin"], entry["brand"], entry["bank"], entry["country"]
 
-# ========== LUHN С АВТОКОРРЕКЦИЕЙ ==========
+# ========== LUHN CORE ==========
 def luhn_verify(card_number):
     digits = [int(d) for d in str(card_number)]
     for i in range(len(digits) - 2, -1, -2):
@@ -121,7 +120,7 @@ def generate_card_number(bin_prefix):
         return generate_card_number(bin_prefix)
     return corrected
 
-# ========== ГЕНЕРАЦИЯ КАРТЫ ==========
+# ========== CARD GENERATION ==========
 def random_card():
     bin_choice, brand, bank, country = random_bin()
     number = generate_card_number(bin_choice)
@@ -151,7 +150,7 @@ def format_raw_line(card):
             f"{card['bank']}|{card['brand']}|{card['type']}|{card['category']}|"
             f"{card['country']}|{card['gate']}|{card['status']}")
 
-# ========== БОТ ==========
+# ========== BOT WITH EXTRA SAFETY ==========
 class CardBot:
     def __init__(self, token, channel):
         self.bot = Bot(token=token)
@@ -159,13 +158,19 @@ class CardBot:
         self.posted = set()
 
     async def post_card(self, card):
+        # 1) Correct Luhn if needed
         corrected = correct_luhn(card['number'])
         if corrected is None:
-            logging.error(f"Неверный номер: {card['number']} – пропуск")
+            logging.error(f"Неисправимый номер: {card['number']} – пропуск")
             return False
         if corrected != card['number']:
             logging.warning(f"Исправлен {card['number']} -> {corrected}")
             card['number'] = corrected
+
+        # 2) Double‑check after correction
+        if not luhn_verify(card['number']):
+            logging.error(f"После коррекции всё равно невалиден: {card['number']} – пропуск")
+            return False
 
         line = format_raw_line(card)
         for attempt in range(3):
@@ -189,16 +194,23 @@ class CardBot:
     async def run_single_cycle(self, count, delay):
         cards = [random_card() for _ in range(count)]
         random.shuffle(cards)
-        logging.info(f"Сгенерировано {len(cards)} карт.")
-        for idx, card in enumerate(cards, 1):
+        # Фильтруем карты с невалидным номером (на случай, если коррекция не сработала)
+        valid_cards = []
+        for card in cards:
+            if luhn_verify(card['number']):
+                valid_cards.append(card)
+            else:
+                logging.warning(f"Отфильтрована невалидная карта: {card['number']}")
+        logging.info(f"Сгенерировано {len(cards)} карт, валидных: {len(valid_cards)}")
+        for idx, card in enumerate(valid_cards, 1):
             if card['number'] in self.posted:
                 continue
             success = await self.post_card(card)
             if idx % 100 == 0:
-                logging.info(f"Прогресс: {idx}/{len(cards)}")
+                logging.info(f"Прогресс: {idx}/{len(valid_cards)}")
             await asyncio.sleep(delay if success else delay * 2)
         self.posted.clear()
-        logging.info(f"Цикл завершён: {len(cards)} карт.")
+        logging.info(f"Цикл завершён: {len(valid_cards)} карт.")
 
     async def run_forever(self, cards_per_cycle, cycle_delay, post_delay):
         cycle = 0
